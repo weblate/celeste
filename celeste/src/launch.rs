@@ -7,8 +7,6 @@ use crate::{
     login::{self},
     migrations::{Migrator, MigratorTrait},
     rclone::{self, RcloneError, RcloneListFilter},
-    traits::prelude::*,
-    util,
 };
 use adw::{
     glib,
@@ -23,15 +21,21 @@ use adw::{
 };
 use file_lock::{FileLock, FileOptions};
 use indexmap::IndexMap;
+use libceleste::traits::prelude::*;
 use sea_orm::{entity::prelude::*, ActiveValue, Database, DatabaseConnection};
+use tempfile::NamedTempFile;
+use zbus::blocking::Connection;
 
 use std::{
     cell::RefCell,
     collections::HashMap,
     fs::{self, OpenOptions},
     io::Write,
+    os::unix::fs::PermissionsExt,
     path::Path,
+    process::Command,
     rc::Rc,
+    sync::{Arc, Mutex},
     thread,
     time::{Duration, SystemTime},
 };
@@ -126,6 +130,46 @@ struct SyncDir {
     error_items: HashMap<SyncError, Box>,
 }
 
+lazy_static::lazy_static! {
+    // A [`Mutex`] to keep track of any recorded close requests.
+    static ref CLOSE_REQUEST: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
+// The DBus application so we can receive close requests from the tray icon.
+struct ZbusApp;
+
+// For some reason this has to be in a separate module or we get some compiler
+// errors :P.
+mod zbus_app {
+    #[zbus::dbus_interface(name = "com.hunterwittenborn.CelesteApp")]
+    impl super::ZbusApp {
+        async fn close(&self) {
+            *(*super::CLOSE_REQUEST).lock().unwrap() = true;
+        }
+    }
+}
+
+/// Start the tray binary.
+fn start_tray() {
+    hw_msg::infoln!("Starting up tray binary...");
+
+    let mut named_temp_file = NamedTempFile::new().unwrap();
+    let temp_file = named_temp_file.path().to_owned();
+    let mut file = named_temp_file.persist(&temp_file).unwrap();
+    let mut perms = file.metadata().unwrap().permissions();
+    perms.set_mode(0o755);
+    file.set_permissions(perms).unwrap();
+
+    #[cfg(debug_assertions)]
+    let tray_file = include_bytes!("../../target/debug/celeste-tray");
+    #[cfg(not(debug_assertions))]
+    let tray_file = include_bytes!("../../target/release/celeste-tray");
+
+    file.write(tray_file).unwrap();
+    drop(file);
+    Command::new(&temp_file).spawn().unwrap();
+}
+
 /// Get an icon for use as the status icon for directory syncs.
 fn get_image(icon_name: &str) -> Image {
     Image::builder()
@@ -137,7 +181,7 @@ fn get_image(icon_name: &str) -> Image {
 
 pub fn launch(app: &Application) {
     // Create the configuration directory if it doesn't exist.
-    let config_path = util::get_config_dir();
+    let config_path = libceleste::get_config_dir();
     if !config_path.exists() && let Err(err) = fs::create_dir_all(&config_path) {
         gtk_util::show_error(
             "Config Error",
@@ -162,7 +206,7 @@ pub fn launch(app: &Application) {
     };
 
     // Connect to the database.
-    let db = util::await_future(Database::connect(format!("sqlite://{}", db_path.display())));
+    let db = libceleste::await_future(Database::connect(format!("sqlite://{}", db_path.display())));
     if let Err(err) = &db {
         gtk_util::show_error(
             "Database Error",
@@ -174,7 +218,7 @@ pub fn launch(app: &Application) {
     let db = db.unwrap();
 
     // Run migrations.
-    if let Err(err) = util::await_future(Migrator::up(&db, None)) {
+    if let Err(err) = libceleste::await_future(Migrator::up(&db, None)) {
         gtk_util::show_error(
             "Database Error",
             &format!("Unable to run database migrations [{err}]"),
@@ -183,21 +227,28 @@ pub fn launch(app: &Application) {
         return;
     }
 
+    // Set up our DBus connection.
+    let dbus = Connection::session().unwrap();
+    dbus.object_server()
+        .at(libceleste::DBUS_APP_OBJECT, ZbusApp)
+        .unwrap();
+    dbus.request_name(libceleste::DBUS_APP_ID).unwrap();
+
     // Get our remotes.
-    let mut remotes = util::await_future(RemotesEntity::find().all(&db)).unwrap();
+    let mut remotes = libceleste::await_future(RemotesEntity::find().all(&db)).unwrap();
 
     if remotes.is_empty() {
         if login::login(app, &db).is_none() {
             return;
         }
 
-        remotes = util::await_future(RemotesEntity::find().all(&db)).unwrap();
+        remotes = libceleste::await_future(RemotesEntity::find().all(&db)).unwrap();
     }
 
     // Create the main UI.
     let window = ApplicationWindow::builder()
         .application(app)
-        .title(&util::get_title!("Servers"))
+        .title(&libceleste::get_title!("Servers"))
         .build();
     let stack_sidebar = StackSidebar::builder()
         .width_request(150)
@@ -249,7 +300,7 @@ pub fn launch(app: &Application) {
             remote_path: String,
         | {
             let server_name_owned = server_name.to_string();
-            let formatted_local_path = util::fmt_home(&local_path);
+            let formatted_local_path = libceleste::fmt_home(&local_path);
             let formatted_remote_path = format!("/{remote_path}");
 
             // The sync status row.
@@ -452,7 +503,7 @@ pub fn launch(app: &Application) {
             more_info_delete_button.connect_clicked(glib::clone!(@strong sync_dir_deletion_queue, @strong server_name, @strong local_path, @strong remote_path, @strong formatted_local_path, @strong formatted_remote_path, @weak sections, @weak more_info_back_button, @weak more_info_delete_button, @strong more_info_widgets => move |_| {
                 more_info_widgets.iter().for_each(|item| item.set_sensitive(false));
                 let dialog = MessageDialog::builder()
-                    .title(&util::get_title!("Confirm Sync Dir Deletion"))
+                    .title(&libceleste::get_title!("Confirm Sync Dir Deletion"))
                     .text(
                         &format!("Are you sure you want to stop syncing {formatted_local_path} to {formatted_remote_path}?")
                     )
@@ -519,7 +570,7 @@ pub fn launch(app: &Application) {
         });
 
         // Create the remote in the database if it doesn't current exist.
-        let db_remote = util::await_future(
+        let db_remote = libceleste::await_future(
                 RemotesEntity::find()
                     .filter(RemotesColumn::Name.eq(remote_name.clone()))
                     .one(&db),
@@ -546,7 +597,7 @@ pub fn launch(app: &Application) {
             new_folder_button.connect_clicked(glib::clone!(@weak window, @weak sections, @weak page, @strong remote_name, @strong sync_dirs, @strong db, @strong directory_map, @strong db_remote, @strong add_dir => @default-panic, move |_| {
                 window.set_sensitive(false);
                 let folder_window = ApplicationWindow::builder()
-                    .title(&util::get_title!("Remote Folder Picker"))
+                    .title(&libceleste::get_title!("Remote Folder Picker"))
                     .build();
                 let folder_sections = Box::builder().orientation(Orientation::Vertical).build();
                 folder_sections.append(&HeaderBar::new());
@@ -563,7 +614,7 @@ pub fn launch(app: &Application) {
                     let filter = FileFilter::new();
                     filter.add_mime_type("inode/directory");
                     let dialog = FileChooserDialog::builder()
-                        .title(&util::get_title!("Local Folder Picker"))
+                        .title(&libceleste::get_title!("Local Folder Picker"))
                         .select_multiple(false)
                         .create_folders(true)
                         .filter(&filter)
@@ -744,7 +795,7 @@ pub fn launch(app: &Application) {
                     folder_window.set_sensitive(false);
 
                     let local_text = local_entry.text().to_string();
-                    let remote_text = util::strip_slashes(remote_entry.text().as_str());
+                    let remote_text = libceleste::strip_slashes(remote_entry.text().as_str());
                     let local_path = Path::new(&local_text);
                     match rclone::sync::stat(&remote_name, &remote_text) {
                         Ok(path) => {
@@ -763,7 +814,7 @@ pub fn launch(app: &Application) {
                         }
                     };
 
-                    let sync_dir = util::await_future(
+                    let sync_dir = libceleste::await_future(
                         SyncDirsEntity::find().filter(SyncDirsColumn::LocalPath.eq(local_text.clone())).filter(SyncDirsColumn::RemotePath.eq(remote_text.clone())).one(&db)
                     ).unwrap();
 
@@ -780,7 +831,7 @@ pub fn launch(app: &Application) {
                         gtk_util::show_error("Validation Error", "The specified local directory needs to be an absolute path", None);
                         folder_window.set_sensitive(true);
                     } else {
-                        util::await_future(
+                        libceleste::await_future(
                             SyncDirsActiveModel {
                                 remote_id: ActiveValue::Set(db_remote.id),
                                 local_path: ActiveValue::Set(local_text.clone()),
@@ -805,7 +856,7 @@ pub fn launch(app: &Application) {
             delete_remote_button.connect_clicked(glib::clone!(@strong remote_deletion_queue, @strong page, @strong remote_name => move |delete_remote_button| {
                 page.set_sensitive(false);
                 let dialog = MessageDialog::builder()
-                    .title(&util::get_title!("Confirm Remote Deletion"))
+                    .title(&libceleste::get_title!("Confirm Remote Deletion"))
                     .text("Are you sure you want to delete this remote?")
                     .secondary_text("All the directories associated with this remote will also stop syncing.")
                     .buttons(ButtonsType::YesNo)
@@ -834,7 +885,7 @@ pub fn launch(app: &Application) {
         // The directory listing.
         {
             // Get the currently present directories.
-            let dirs = util::await_future(
+            let dirs = libceleste::await_future(
                 SyncDirsEntity::find()
                     .filter(SyncDirsColumn::RemoteId.eq(db_remote.id))
                     .all(&db),
@@ -861,9 +912,6 @@ pub fn launch(app: &Application) {
         let window = gen_remote_window(remote.clone());
         stack.add_titled(&window, Some(&remote.name), &remote.name);
     }
-
-    // The request to close the window.
-    let quit_request = Rc::new(RefCell::new(false));
 
     // Set up the main sections.
     let sections = Leaflet::builder()
@@ -909,12 +957,10 @@ pub fn launch(app: &Application) {
         .label("Quit")
         .css_classes(vec!["flat".to_string()])
         .build();
-    sidebar_menu_quit_button.connect_clicked(
-        glib::clone!(@weak sidebar_menu_popover, @strong quit_request => move |_| {
-            sidebar_menu_popover.popdown();
-            *quit_request.get_mut_ref() = true;
-        }),
-    );
+    sidebar_menu_quit_button.connect_clicked(glib::clone!(@weak sidebar_menu_popover => move |_| {
+        sidebar_menu_popover.popdown();
+        *(*CLOSE_REQUEST).lock().unwrap() = true;
+    }));
     sidebar_menu_popover_sections.append(&sidebar_menu_about_button);
     sidebar_menu_popover_sections.append(&sidebar_menu_quit_button);
     sidebar_menu_popover.set_parent(&sidebar_menu_button);
@@ -979,17 +1025,46 @@ pub fn launch(app: &Application) {
         window.hide();
         Inhibit(true)
     });
-    // Show the window and start syncing.
-    window.show();
 
+    // Show the window, start up the tray, and start syncing.
+    window.show();
+    start_tray();
+
+    let send_dbus_msg = |msg: &str| {
+        dbus.call_method(
+            Some(libceleste::TRAY_ID),
+            libceleste::DBUS_TRAY_OBJECT,
+            Some(libceleste::TRAY_ID),
+            "UpdateStatus",
+            &(msg),
+        )
+    };
+
+    // Wait until we can succesfully send a message to the tray icon.
+    while send_dbus_msg("Awaiting sync checks...").is_err() {}
+    
     'main: loop {
-        // If the user requested to quit the application, then break the loop.
-        if *quit_request.get_ref() {
+        // If the user requested to quit the application, then close the tray icon and
+        // break the loop.
+        if *(*CLOSE_REQUEST).lock().unwrap() {
+            // I'm not sure when this can fail, so output an error if one is received.
+            if let Err(err) = dbus.call_method(
+                Some(libceleste::TRAY_ID),
+                libceleste::DBUS_TRAY_OBJECT,
+                Some(libceleste::TRAY_ID),
+                "Close",
+                &(),
+            ) {
+                hw_msg::warningln!(
+                    "Got error while sending close request to application: '{err}'."
+                );
+            }
+
             break 'main;
         }
 
         // Continue with syncing.
-        let remotes = util::await_future(RemotesEntity::find().all(&db)).unwrap();
+        let remotes = libceleste::await_future(RemotesEntity::find().all(&db)).unwrap();
 
         // If no remotes are present we need to close the window and ask the user to log
         // in again.
@@ -1004,7 +1079,7 @@ pub fn launch(app: &Application) {
             }
         }
 
-        util::run_in_background(|| thread::sleep(Duration::from_millis(500)));
+        libceleste::run_in_background(|| thread::sleep(Duration::from_millis(500)));
 
         for remote in remotes {
             // Process any remote deletion requests.
@@ -1019,7 +1094,7 @@ pub fn launch(app: &Application) {
                     stack.remove(&child);
 
                     // Delete all related database entries.
-                    util::await_future(async {
+                    libceleste::await_future(async {
                         let db_remote = RemotesEntity::find()
                             .filter(RemotesColumn::Name.eq(remote_name.clone()))
                             .one(&db)
@@ -1049,7 +1124,11 @@ pub fn launch(app: &Application) {
                 }
             }
 
-            let sync_dirs = util::await_future(
+            // Notify the tray app that we're syncing this remote now.
+            let status_string = format!("Syncing '{}'...", remote.name);
+            send_dbus_msg(&status_string).unwrap();
+
+            let sync_dirs = libceleste::await_future(
                 SyncDirsEntity::find()
                     .filter(SyncDirsColumn::RemoteId.eq(remote.id))
                     .all(&db),
@@ -1124,7 +1203,7 @@ pub fn launch(app: &Application) {
                         match &error {
                             SyncError::General(_, _) => {
                                 let dialog = MessageDialog::builder()
-                                    .title(&util::get_title!("Sync Error"))
+                                    .title(&libceleste::get_title!("Sync Error"))
                                     .text("Would you like to dismiss this error?")
                                     .buttons(ButtonsType::YesNo)
                                     .build();
@@ -1148,7 +1227,7 @@ pub fn launch(app: &Application) {
                                 dialog.show();
                             },
                             SyncError::BothMoreCurrent(local_item, remote_item) => {
-                                let local_item_formatted = util::fmt_home(local_item);
+                                let local_item_formatted = libceleste::fmt_home(local_item);
                                 let local_path = Path::new(&local_item);
                                 let sync_local_to_remote = glib::clone!(@strong remote, @strong local_item_formatted, @strong local_item, @strong remote_item => move || {
                                     if let Err(err) = rclone::sync::copy_to_remote(&local_item, &remote.name, &remote_item) {
@@ -1170,7 +1249,7 @@ pub fn launch(app: &Application) {
                                 let update_db_item = glib::clone!(@strong db, @strong remote, @strong local_item, @strong remote_item => move || {
                                     let local_timestamp = Path::new(&local_item).metadata().unwrap().modified().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
                                     let remote_timestamp = rclone::sync::stat(&remote.name, &remote_item).unwrap().unwrap().mod_time.unix_timestamp();
-                                    let mut active_model: SyncItemsActiveModel = util::await_future(SyncItemsEntity::find()
+                                    let mut active_model: SyncItemsActiveModel = libceleste::await_future(SyncItemsEntity::find()
                                         .filter(SyncItemsColumn::LocalPath.eq(local_item.clone()))
                                         .filter(SyncItemsColumn::RemotePath.eq(remote_item.clone()))
                                         .one(&db)
@@ -1179,7 +1258,7 @@ pub fn launch(app: &Application) {
                                     .into();
                                     active_model.last_local_timestamp = ActiveValue::set(local_timestamp.try_into().unwrap());
                                     active_model.last_remote_timestamp = ActiveValue::Set(remote_timestamp.try_into().unwrap());
-                                    util::await_future(active_model.update(&db)).unwrap();
+                                    libceleste::await_future(active_model.update(&db)).unwrap();
                                 });
                                 let rclone_remote_item = match rclone::sync::stat(&remote.name, remote_item) {
                                     Ok(item) => item,
@@ -1217,7 +1296,7 @@ pub fn launch(app: &Application) {
                                 }
 
                                 let dialog = MessageDialog::builder()
-                                    .title(&util::get_title!("Sync Error"))
+                                    .title(&libceleste::get_title!("Sync Error"))
                                     .text(
                                         &format!("Both the local item '{local_item_formatted}' and remote item '{remote_item}' have been updated since the last sync.")
                                     )
@@ -1303,7 +1382,7 @@ pub fn launch(app: &Application) {
                         dmap.get_mut(&queue_item.0).unwrap().remove(&dir_pair).unwrap();
 
                         // Remove the item from the database.
-                        util::await_future(async {
+                        libceleste::await_future(async {
                             let sync_dir = SyncDirsEntity::find()
                                 .filter(SyncDirsColumn::LocalPath.eq(queue_item.1.clone()))
                                 .filter(SyncDirsColumn::RemotePath.eq(queue_item.2.clone()))
@@ -1330,7 +1409,7 @@ pub fn launch(app: &Application) {
                         stack.remove(&child);
 
                         // Delete all related database entries.
-                        util::await_future(async {
+                        libceleste::await_future(async {
                             let db_remote = RemotesEntity::find()
                                 .filter(RemotesColumn::Name.eq(remote_name.clone()))
                                 .one(&db)
@@ -1374,7 +1453,6 @@ pub fn launch(app: &Application) {
                     db: &DatabaseConnection,
                     directory_map: &DirectoryMap,
                     synced_items: &RefCell<Vec<(String, String)>>,
-                    quit_request: &Rc<RefCell<bool>>,
                     add_error: F1,
                     process_deletion_requests: F2,
                 ) {
@@ -1392,7 +1470,7 @@ pub fn launch(app: &Application) {
                         let dir_pair = (sync_dir.local_path.clone(), sync_dir.remote_path.clone());
                         let item = ptr.get(&remote.name).unwrap().get(&dir_pair).unwrap();
                         let status_string =
-                            format!("Checking '{}' for changes...", util::fmt_home(dir));
+                            format!("Checking '{}' for changes...", libceleste::fmt_home(dir));
                         item.status_text.set_label(&status_string);
                     };
                     update_ui_progress(&dir_string);
@@ -1432,7 +1510,7 @@ pub fn launch(app: &Application) {
                     for item in directory {
                         // If a close request was sent in, stop syncing this remote so we can quit
                         // the application in the 'main loop.
-                        if *quit_request.get_ref() {
+                        if *(*CLOSE_REQUEST).lock().unwrap() {
                             break;
                         }
 
@@ -1500,7 +1578,7 @@ pub fn launch(app: &Application) {
                         let remote_utc_timestamp = remote_item
                             .as_ref()
                             .map(|item| item.mod_time.unix_timestamp());
-                        let db_item = util::await_future(
+                        let db_item = libceleste::await_future(
                             SyncItemsEntity::find()
                                 .filter(SyncItemsColumn::LocalPath.eq(local_path.clone()))
                                 .filter(SyncItemsColumn::RemotePath.eq(remote_path.clone()))
@@ -1543,7 +1621,6 @@ pub fn launch(app: &Application) {
                                     db,
                                     directory_map,
                                     synced_items,
-                                    quit_request,
                                     add_error.clone(),
                                     process_deletion_requests.clone(),
                                 );
@@ -1585,7 +1662,6 @@ pub fn launch(app: &Application) {
                                     db,
                                     directory_map,
                                     synced_items,
-                                    quit_request,
                                     add_error.clone(),
                                     process_deletion_requests.clone(),
                                 );
@@ -1601,7 +1677,7 @@ pub fn launch(app: &Application) {
                         };
                         // Delete this item from the database.
                         let delete_db_entry = || {
-                            util::await_future(async {
+                            libceleste::await_future(async {
                                 SyncItemsEntity::find()
                                     .filter(SyncItemsColumn::SyncDirId.eq(sync_dir.id))
                                     .filter(SyncItemsColumn::LocalPath.eq(local_path.clone()))
@@ -1626,7 +1702,7 @@ pub fn launch(app: &Application) {
                                     ActiveValue::Set(local_timestamp);
                                 active_model.last_remote_timestamp =
                                     ActiveValue::Set(remote_timestamp);
-                                util::await_future(active_model.update(db)).unwrap();
+                                libceleste::await_future(active_model.update(db)).unwrap();
                             };
 
                             // Both items are more current than at the last transaction - we need to
@@ -1715,7 +1791,7 @@ pub fn launch(app: &Application) {
                             };
 
                             // Record the current transaction's timestamps in the database.
-                            util::await_future(
+                            libceleste::await_future(
                                 SyncItemsActiveModel {
                                     sync_dir_id: ActiveValue::Set(sync_dir.id),
                                     local_path: ActiveValue::Set(local_path.clone()),
@@ -1751,7 +1827,6 @@ pub fn launch(app: &Application) {
                     db: &DatabaseConnection,
                     directory_map: &DirectoryMap,
                     synced_items: &RefCell<Vec<(String, String)>>,
-                    quit_request: &Rc<RefCell<bool>>,
                     add_error: F1,
                     process_deletion_requests: F2,
                 ) {
@@ -1810,7 +1885,7 @@ pub fn launch(app: &Application) {
                     for item in items {
                         // If a close request was sent in, stop syncing this remote so we can quit
                         // the application in the 'main loop.
-                        if *quit_request.get_ref() {
+                        if *(*CLOSE_REQUEST).lock().unwrap() {
                             break;
                         }
 
@@ -1859,7 +1934,7 @@ pub fn launch(app: &Application) {
                             })
                         };
                         let local_timestamp = get_local_file_timestamp();
-                        let db_item = util::await_future(
+                        let db_item = libceleste::await_future(
                             SyncItemsEntity::find()
                                 .filter(SyncItemsColumn::LocalPath.eq(local_path_string.clone()))
                                 .filter(SyncItemsColumn::RemotePath.eq(remote_path_string.clone()))
@@ -1903,7 +1978,6 @@ pub fn launch(app: &Application) {
                                     db,
                                     directory_map,
                                     synced_items,
-                                    quit_request,
                                     add_error.clone(),
                                     process_deletion_requests.clone(),
                                 );
@@ -1983,7 +2057,6 @@ pub fn launch(app: &Application) {
                                     db,
                                     directory_map,
                                     synced_items,
-                                    quit_request,
                                     add_error.clone(),
                                     process_deletion_requests.clone(),
                                 );
@@ -2004,7 +2077,7 @@ pub fn launch(app: &Application) {
                         };
                         // Delete this item from the database.
                         let delete_db_entry = || {
-                            util::await_future(async {
+                            libceleste::await_future(async {
                                 SyncItemsEntity::find()
                                     .filter(SyncItemsColumn::SyncDirId.eq(sync_dir.id))
                                     .filter(
@@ -2032,7 +2105,7 @@ pub fn launch(app: &Application) {
                                     ActiveValue::Set(local_timestamp);
                                 active_model.last_remote_timestamp =
                                     ActiveValue::Set(remote_timestamp);
-                                util::await_future(active_model.update(db)).unwrap();
+                                libceleste::await_future(active_model.update(db)).unwrap();
                             };
 
                             // Both items are more recent.
@@ -2115,7 +2188,7 @@ pub fn launch(app: &Application) {
                             };
 
                         // Record the current transaction's timestamps in the database.
-                        util::await_future(
+                        libceleste::await_future(
                             SyncItemsActiveModel {
                                 sync_dir_id: ActiveValue::Set(sync_dir.id),
                                 local_path: ActiveValue::Set(local_path_string.clone()),
@@ -2141,7 +2214,6 @@ pub fn launch(app: &Application) {
                     &db,
                     &directory_map,
                     &synced_items,
-                    &quit_request,
                     &add_error,
                     &process_deletion_requests,
                 );
@@ -2152,21 +2224,20 @@ pub fn launch(app: &Application) {
                     &db,
                     &directory_map,
                     &synced_items,
-                    &quit_request,
                     &add_error,
                     &process_deletion_requests,
                 );
 
                 // If a close request was sent in, quit.
-                if *quit_request.get_ref() {
-                    break 'main;
+                if *(*CLOSE_REQUEST).lock().unwrap() {
+                    continue 'main;
                 }
 
                 // If this sync directory doesn't exist anymore (from being deleted during
                 // `process_deletion_requests` calls in the about two functions), go to the next
                 // sync directory.
                 if !sync_dir.exists(&db) {
-                    continue;
+                    continue 'main;
                 }
 
                 // Set up the UI for notifying the user that this directory has been synced.
@@ -2191,9 +2262,13 @@ pub fn launch(app: &Application) {
                 drop(item_ptr);
             }
         }
+
+        // Notify that we've finished checking all remotes for changes.
+        send_dbus_msg("Finished sync checks.").unwrap();
     }
 
-    // We broke out of the loop because of a close request, so close and destroy the window.
+    // We broke out of the loop because of a close request, so close and destroy the
+    // window.
     window.close();
     window.destroy();
 }

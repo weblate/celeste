@@ -1,0 +1,25 @@
+# To build this Flatpak, you should call `just build` instead of calling `flatpak-builder` directly.
+app-id: com.hunterwittenborn.Celeste
+runtime: org.gnome.Platform
+runtime-version: "42"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-nightly
+command: celeste
+build-options:
+  append-path: /usr/lib/sdk/rust-nightly/bin
+modules:
+  - name: celeste
+    buildsystem: simple
+    build-options:
+      env:
+        CARGO_HOME: /run/build/celeste/cargo
+    build-commands:
+      - "ls"
+      - "cargo --offline fetch --manifest-path Cargo.toml --verbose"
+      - "cargo --offline build --release --verbose"
+      - "install -Dm 755 target/release/celeste -t /app/bin/celeste"
+    sources:
+      - type: dir
+        path: ../
+      - cargo-sources.json

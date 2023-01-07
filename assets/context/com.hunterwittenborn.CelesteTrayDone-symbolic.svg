@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg height="16px" viewBox="0 0 16 16" width="16px" xmlns="http://www.w3.org/2000/svg">
+    <path d="m 2 12.5 h 12 v 1 h -12 z m 0 0" fill-opacity="0.4"/>
+    <path d="m 5 5 h 6 c 0.550781 0 1 0.449219 1 1 v 6.5 h -8 v -6.5 c 0 -0.550781 0.449219 -1 1 -1 z m 0 0" fill-opacity="0.101961"/>
+    <path d="m 5 2.5 h 6 c 0.550781 0 1 0.449219 1 1 v 9 h -8 v -9 c 0 -0.550781 0.449219 -1 1 -1 z m 0 0" fill-opacity="0.101961"/>
+    <path d="m 5 10 h 4 v 1 h -4 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 2 11.5 h 2 v 1 h -2 z m 0 0" fill-opacity="0.4"/>
+    <path d="m 12 11.5 h 2 v 1 h -2 z m 0 0" fill-opacity="0.4"/>
+    <path d="m 10 10 h 1 v 1 h -1 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 8 6 h 3 v 1 h -3 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 9 3.5 h 2 v 1 h -2 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 7 8 h 4 v 1 h -4 z m 0 0" fill-opacity="0.25098"/>
+    <g fill-opacity="0.4">
+        <path d="m 2 8.5 h 2 v 1 h -2 z m 0 0"/>
+        <path d="m 2 9.5 h 2 v 1 h -2 z m 0 0"/>
+        <path d="m 12 9.5 h 2 v 1 h -2 z m 0 0"/>
+        <path d="m 12 8.5 h 2 v 1 h -2 z m 0 0"/>
+    </g>
+    <path d="m 5 6 h 2 v 1 h -2 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 5 3.5 h 3 v 1 h -3 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 5 8 h 1 v 1 h -1 z m 0 0" fill-opacity="0.25098"/>
+    <path d="m 11 13 l 1.5 1.5 l 3 -3 l -0.5 -0.5 l -2.5 2.5 l -1 -1 z m 0 0" fill="none" stroke="#000000" stroke-width="0.999999"/>
+</svg>
