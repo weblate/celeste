@@ -697,114 +697,56 @@ pub fn launch(app: &Application, background: bool) {
                 let remote_label = Label::builder().label(&tr::tr!("Remote folder:")).halign(Align::Start).css_classes(vec!["heading".to_string()]).build();
                 let entry_completion = EntryCompletion::new();
                 let store = ListStore::new(&[glib::Type::STRING]);
+
+                // The path that this store is currently valid on, excluding everything after the
+                // last `/` in the UI. We use this to detect when we need to obtain the list of
+                // directories from the remote again. The [`Vec`] of [`String`]s is a vector of
+                // rightmost dir items (i.e. it would contain `bar` instead of `/foo/bar`) because
+                // of how `update_options` is called below, so checks need to be done to make sure
+                // that the currently typed in path is the same as the one in the tuple's [`Path`]
+                // element.
+                let store_path: Rc<RefCell<(&Path, Vec<String>)>> = Rc::new(RefCell::new((Path::new(""), vec![])));
+
                 entry_completion.set_text_column(0);
                 entry_completion.set_popup_completion(true);
                 entry_completion.set_model(Some(&store));
                 let remote_entry = Entry::builder().completion(&entry_completion).build();
                 remote_entry.insert_text("/", &mut -1);
-                let get_remotes = || {
-                    let mut err: Option<RcloneError> = None;
-                    let mut dirs = vec![];
+                
+                // Update the UI completions against the list of stored directories.
+                let update_completions = glib::clone!(@weak entry_completion, @strong store, @weak remote_entry, @weak store, @strong store_path, => move || {
+                    // Get the current specified directory.
+                    let current_item_text = remote_entry.text();
+                    let current_item = Path::new(current_item_text.as_str()).file_name().unwrap_or_else(|| "".as_ref()).to_str().unwrap();
 
-                    for _ in 0..3 {
-                        match rclone::sync::list(&remote_name, "/", true, RcloneListFilter::Dirs) {
-                            Ok(folders) => {
-                                err = None;
-                                dirs = folders.iter().map(|item| item.path.clone()).collect::<Vec<String>>();
-                                break;
-                            },
-                            Err(rclone_err) => err = Some(rclone_err),
-                        }
-                    }
-
-                    if err.is_some() {
-                        vec![]
-                    } else {
-                        dirs
-                    }
-                };
-                let remotes = Rc::new(RefCell::new(get_remotes()));
-
-                remote_entry.connect_changed(glib::clone!(@strong remote_name, @weak store, @strong remotes => move |entry| {
+                    // Clear the current list of completions.
                     store.clear();
-                    let borrowed_remotes = remotes.borrow();
-                    let mut valid_remotes = vec![];
 
-                    // Get the currently specified directory by getting everything up to the last `/` (or nothing if none is present).
-                    // Also remove any '/' at the beginning of a string if present, as Rclone strips them too and we'll have missing matches in our completion dropdown otherwise.
-                    let entry_text = match entry.text().to_string().strip_prefix('/') {
-                        Some(string) => string.to_string(),
-                        None => entry.text().to_string()
-                    };
-                    let directory = match entry_text.rsplit_once('/') {
-                        Some((string, _)) => string.to_string() + "/",
-                        None => String::new()
-                    };
-
-                    // Get the list of remotes we want to present to the user.
-                    for remote in &*borrowed_remotes {
-                        if remote.starts_with(&directory) {
-                            let remote_stripped = if !directory.is_empty() {
-                                remote.strip_prefix(&directory).unwrap().to_string()
-                            } else {
-                                remote.to_string()
-                            };
-
-                            match remote_stripped.split_once('/') {
-                                Some((string, _)) => valid_remotes.push(string.to_string()),
-                                None => valid_remotes.push(remote_stripped.to_string())
-                            }
+                    // See if any of the currently stored matches start with the same characters as
+                    // our path, and if they do, append them to the valid completions list.
+                    for item in &store_path.get_ref().1 {
+                        if item.starts_with(current_item) {
+                            store.set(&store.append(), &[(0, item)]);
                         }
                     }
-
-                    valid_remotes.sort_unstable();
-                    valid_remotes.dedup();
-
-                    for remote in valid_remotes {
-                        store.set(&store.append(), &[(0, &remote)]);
-                    }
-                }));
-                entry_completion.set_match_func(glib::clone!(@strong remote_entry => move |completion, _entry_str, tree_iter| {
-                    let tree_model = completion.model().unwrap();
-                    let text_column = completion.text_column();
-                    let text_value = match tree_model.get_value(tree_iter, text_column).get::<String>() {
-                        // Not quite sure when this could be failing, but it does sometimes so just return early if that's the case.
-                        Ok(value) => value,
-                        Err(_) => return false,
-                    };
-
-                    // The last component of the directory specified by the user.
-                    let entry_text = remote_entry.text().to_string();
-                    let directory = match entry_text.rsplit_once('/') {
-                        Some((_, string)) => string.to_string(),
-                        None => entry_text
-                    };
-
-                    text_value.starts_with(&directory)
-                }));
-                entry_completion.connect_match_selected(glib::clone!(@strong remote_entry => move |_, model, iter| {
-                    let new_text = model.get::<String>(iter, 0);
-                    let current_text = remote_entry.text().to_string();
-                    let current_text_up_to_slash = match current_text.rsplit_once('/') {
-                        Some((string, _)) => string.to_string(),
-                        None => String::new()
-                    };
-
-                    remote_entry.delete_text(current_text_up_to_slash.len() as i32, -1);
-                    if current_text_up_to_slash.is_empty() {
-                        // If we're at the first directory component (i.e. `/Doc` and filling in `Documents/`), we need to check if the user entered a `/` at the beginning so we can preserve it.
-                        if current_text.starts_with('/') {
-                            remote_entry.insert_text("/", &mut -1);
-                        }
-
-                        remote_entry.insert_text(&format!("{new_text}/"), &mut -1);
+                });
+                
+                // Update the stored list of autocompletions to those of the currently typed in
+                // directory.
+                let update_options = glib::clone!(@strong remote_name, @strong store_path, @weak remote_entry, @strong update_completions => move || {
+                    let text = remote_entry.text().to_string();
+                    let current_parent = Path::new(&text).parent().unwrap_or_else(|| Path::new(""));
+                    
+                    let current_parent_string = current_parent.as_os_str().to_str().unwrap();
+                    store_path.get_mut_ref().1 = if let Ok(items) = rclone::sync::list(&remote_name, current_parent_string, false, RcloneListFilter::Dirs) {
+                        items.into_iter().map(|item| item.name).collect()
                     } else {
-                        remote_entry.insert_text(&format!("/{new_text}/"), &mut -1);
-                    }
+                        vec![]
+                    };
+                });
 
-                    remote_entry.grab_focus().then_some(()).unwrap();
-                    remote_entry.set_position(-1);
-                    Inhibit(true)
+                remote_entry.connect_changed(glib::clone!(@strong remote_name, @weak store => move |entry| {
+                    todo!()
                 }));
                 folder_sections.append(&local_label);
                 folder_sections.append(&local_entry);
