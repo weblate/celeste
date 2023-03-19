@@ -7,6 +7,7 @@ use crate::{
     login::{self},
     migrations::{Migrator, MigratorTrait},
     rclone::{self, RcloneError, RcloneListFilter},
+    mpsc
 };
 use adw::{
     glib,
@@ -35,7 +36,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     os::unix::fs::PermissionsExt,
-    path::Path,
+    path::{Path ,PathBuf},
     process::{Child, Command},
     rc::Rc,
     sync::{Arc, Mutex},
@@ -705,7 +706,7 @@ pub fn launch(app: &Application, background: bool) {
                 // of how `update_options` is called below, so checks need to be done to make sure
                 // that the currently typed in path is the same as the one in the tuple's [`Path`]
                 // element.
-                let store_path: Rc<RefCell<(&Path, Vec<String>)>> = Rc::new(RefCell::new((Path::new(""), vec![])));
+                let store_path: Rc<RefCell<(PathBuf, Vec<String>)>> = Rc::new(RefCell::new((Path::new("").to_owned(), vec![])));
 
                 entry_completion.set_text_column(0);
                 entry_completion.set_popup_completion(true);
@@ -730,24 +731,59 @@ pub fn launch(app: &Application, background: bool) {
                         }
                     }
                 });
-                
-                // Update the stored list of autocompletions to those of the currently typed in
-                // directory.
+
+                // Update the stored list of autocompletions to the parent of those of the currently typed in directory.
                 let update_options = glib::clone!(@strong remote_name, @strong store_path, @weak remote_entry, @strong update_completions => move || {
                     let text = remote_entry.text().to_string();
                     let current_parent = Path::new(&text).parent().unwrap_or_else(|| Path::new(""));
                     
-                    let current_parent_string = current_parent.as_os_str().to_str().unwrap();
-                    store_path.get_mut_ref().1 = if let Ok(items) = rclone::sync::list(&remote_name, current_parent_string, false, RcloneListFilter::Dirs) {
-                        items.into_iter().map(|item| item.name).collect()
-                    } else {
-                        vec![]
-                    };
+                    let current_parent_string = current_parent.as_os_str().to_owned().into_string().unwrap();
+                    let (sender, mut receiver) = mpsc::channel();
+
+                    // Fetch the remote items on another thread so we don't block the main thread while it happens.
+                    thread::spawn(move || {
+                        let items = if let Ok(items) = rclone::sync::list(&remote_name, &current_parent_string, false, RcloneListFilter::Dirs) {
+                            items.into_iter().map(|item| item.name).collect()
+                        } else {
+                            vec![]
+                        };
+
+                        sender.send(items);
+                    });
+
+                    // If the current parent path is still the same (i.e. after the thread above has finished, which may have taken a bit), then update the completions to reflect the items we got.
+                    let items = receiver.recv();
+                    let mut store_path_ref = store_path.get_mut_ref();
+
+                    if &store_path_ref.0 == current_parent {
+                        store_path_ref.1 = items;
+                        // Drop `store_path_ref` so `update_completions` can get its own reference.
+                        drop(store_path_ref);
+                        update_completions();
+                    }
                 });
 
-                remote_entry.connect_changed(glib::clone!(@strong remote_name, @weak store => move |entry| {
-                    todo!()
+                remote_entry.connect_changed(glib::clone!(@strong remote_name, @weak store_path, @strong update_completions, @strong update_options => move |remote_entry| {
+                    // For some reason we have to clone the closure to pass the borrow checker, even though we clone it via the 'glib::clone!' above. Not sure why yet.
+                    let update_options = update_options.clone();
+
+                    let text = remote_entry.text().to_string();
+                    let current_parent = Path::new(&text).parent().unwrap_or_else(|| Path::new(""));
+
+                    let mut store_path_ref = store_path.get_mut_ref();
+
+                    if store_path_ref.0 == current_parent {
+                        // Drop our ref to `store_path_ref` so `update_completions` can get it's own.
+                        drop(store_path_ref);
+                        update_completions();
+                    } else {
+                        store_path_ref.0 = current_parent.to_owned();
+                        // Drop our ref to `store_path_ref` so `update_options` can get it's own.
+                        drop(store_path_ref);
+                        update_options();
+                    }
                 }));
+
                 folder_sections.append(&local_label);
                 folder_sections.append(&local_entry);
                 folder_sections.append(&Separator::builder().orientation(Orientation::Vertical).css_classes(vec!["spacer".to_string()]).build());
@@ -2364,6 +2400,7 @@ pub fn launch(app: &Application, background: bool) {
 
         // Notify that we've finished checking all remotes for changes.
         let error_count = sync_errors_count();
+        
         if error_count != 0 {
             let error_msg = if error_count == 1 {
                 "Finished sync checks with 1 error.".to_string()

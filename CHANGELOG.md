@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed loading times when adding remotes with high storage usage.
+- Fixed freeze when ports needed by `rclone authorize` are already being used.
 
 ## [0.4.6] - 2023-02-24
 ### Fixed

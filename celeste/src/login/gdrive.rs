@@ -166,14 +166,26 @@ impl GDriveConfig {
                     process_stderr.lock().unwrap().push('\n');
                 }
             }));
-
+            
+            // Get the URL rclone will use for authentication by reading the process' stderr.
             loop {
-                if process_stdout.lock().unwrap().contains('\n') {
-                    *STATE_URL.lock().unwrap() = process_stdout.lock().unwrap().lines().next().unwrap().split_whitespace().last().unwrap().to_owned();
+                // If the rclone process has already aborted, go ahead and break so we can show the error down below.
+                if process.try_wait().unwrap().is_some() {
                     break
                 }
+
+                // Otherwise check if the URL line has been printed, by checking for the auth URL.
+                if let Some(line) = process_stderr.lock().unwrap().lines().find(|line| line.contains("http://127.0.0.1:53682/auth")) {
+                 // The URL will be the last space-separated item on the line.
+                    *STATE_URL.lock().unwrap() = line.split_whitespace().last().unwrap().to_owned();
+                    break
+                }
+
                 libceleste::run_in_background(|| thread::sleep(Duration::from_millis(500)));
             }
+
+            hw_msg::warningln!("STATE URL: {}", STATE_URL.lock().unwrap());
+            hw_msg::warningln!("DEBUGGING: {}", process_stderr.lock().unwrap());
 
             let kill_request = Rc::new(RefCell::new(false));
 
