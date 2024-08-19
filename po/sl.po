@@ -8,141 +8,147 @@ msgstr ""
 "Project-Id-Version: Celeste 0.8.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-11-19 01:22+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"PO-Revision-Date: 2024-08-20 20:09+0000\n"
+"Last-Translator: Matej U <mateju@src.gnome.org>\n"
+"Language-Team: Slovenian <https://hosted.weblate.org/projects/celeste/"
+"celeste/sl/>\n"
 "Language: sl\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || "
+"n%100==4 ? 2 : 3;\n"
+"X-Generator: Weblate 5.7\n"
 
 #: src/about.rs:20
 msgid "App icons by"
-msgstr ""
+msgstr "Ikone je ustvaril"
 
 #: src/gtk_util.rs:20 src/gtk_util.rs:43 src/launch.rs:614 src/launch.rs:776
 msgid "Ok"
-msgstr ""
+msgstr "V redu"
 
 #: src/launch.rs:99
 msgid "Both '{}' and '{}' are more recent than at last sync."
-msgstr ""
+msgstr "Tako »{}« kot »{}« sta novejši kot ob zadnjem usklajevanju."
 
 #: src/launch.rs:158
 msgid "Unable to create Celeste's config directory [{}]."
-msgstr ""
+msgstr "Ni mogoče ustvariti nastavitvene mape programa [{}]."
 
 #: src/launch.rs:170
 msgid "Unable to create Celeste's database file [{}]."
-msgstr ""
+msgstr "Ni mogoče ustvariti datoteke podatkovne zbirke programa [{}]."
 
 #: src/launch.rs:180
 msgid "Unable to connect to database [{}]."
-msgstr ""
+msgstr "Povezava s podatkovno zbirko ni mogoča [{}]."
 
 #: src/launch.rs:188
 msgid "Unable to run database migrations [{}]"
-msgstr ""
+msgstr "Ni mogoče zagnati preselitve podatkovne zbirke [{}]"
 
 #: src/launch.rs:288
 msgid "Awaiting sync check..."
-msgstr ""
+msgstr "Preverjanje sprememb za usklajevanje ..."
 
 #: src/launch.rs:324
 msgid "Sync Errors"
-msgstr ""
+msgstr "Napake usklajevanja"
 
 #: src/launch.rs:339
 msgid "File/Folder Exclusions"
-msgstr ""
+msgstr "Izvzete datoteke in mape"
 
 #: src/launch.rs:458
 msgid "Stop syncing this directory"
-msgstr ""
+msgstr "Zaustavi usklajevanje te mape"
 
 #: src/launch.rs:475
 msgid "Are you sure you want to stop syncing '{}' to '{}'?"
-msgstr ""
+msgstr "Ali ste prepričani, da želite ustaviti usklajevanje »{}« v »{}«?"
 
 #: src/launch.rs:484
 msgid "This directory is currently being processed to no longer be synced."
-msgstr ""
+msgstr "Ta mapa je trenutno v pripravi, da se ne bo več usklajevala."
 
 #: src/launch.rs:574
 msgid "Directories"
-msgstr ""
+msgstr "Mape"
 
 #. Get the local folder to sync with.
 #: src/launch.rs:597
 msgid "Local folder:"
-msgstr ""
+msgstr "Krajevna mapa:"
 
 #: src/launch.rs:613 src/launch.rs:775 src/login/gdrive.rs:214
 msgid "Cancel"
-msgstr ""
+msgstr "Prekliči"
 
 #. Get the remote folder to sync with, and add it.
 #. The entry completion code is largely inspired by https://github.com/gtk-rs/gtk4-rs/blob/master/examples/entry_completion/main.rs. I honestly have no clue what half the code for that is doing, I just know the current code is working well enough, and it can be fixed later if it breaks.
 #: src/launch.rs:633
 msgid "Remote folder:"
-msgstr ""
+msgstr "Oddaljena mapa:"
 
 #: src/launch.rs:820
 msgid "The specified remote directory doesn't exist"
-msgstr ""
+msgstr "Navedena oddaljena mapa ne obstaja"
 
 #: src/launch.rs:828
 msgid "Failed to check if the specified remote directory exists"
-msgstr ""
+msgstr "Preverjanje, ali navedeni oddaljena mapa obstaja, je spodletelo"
 
 #: src/launch.rs:839
 msgid "The specified directory pair is already being synced"
-msgstr ""
+msgstr "Določen par map se že usklajuje"
 
 #: src/launch.rs:842
 msgid "The specified local directory doesn't exist"
-msgstr ""
+msgstr "Določena krajevna mapa ne obstaja"
 
 #: src/launch.rs:845
 msgid "The specified local path isn't a directory"
-msgstr ""
+msgstr "Določena krajevna pot ni pot do mape"
 
 #: src/launch.rs:848
 msgid "The specified local directory needs to be an absolute path"
-msgstr ""
+msgstr "Določena krajevna mapa mora biti zavedena kot absolutna pot"
 
 #: src/launch.rs:876
 msgid "Are you sure you want to delete this remote?"
-msgstr ""
+msgstr "Ali ste prepričani, da želite izbrisati to oddaljeno mesto?"
 
 #: src/launch.rs:877
 msgid "All the directories associated with this remote will also stop syncing."
 msgstr ""
+"Tudi vse mape, povezane s tem oddaljenim strežnikom, se prenehajo "
+"usklajevati."
 
 #: src/launch.rs:1342 src/launch.rs:2509
 msgid "Files are synced."
-msgstr ""
+msgstr "Datoteke so usklajene."
 
 #: src/launch.rs:1352
 msgid "Syncing '{}'..."
-msgstr ""
+msgstr "Poteka usklajevanje »{}«..."
 
 #: src/launch.rs:1373
 msgid "Checking for changes..."
-msgstr ""
+msgstr "Poteka preverjanje sprememb ..."
 
 #. Add an error for reporting in the UI.
 #: src/launch.rs:1380
 msgid "Please resolve the reported syncing issues."
-msgstr ""
+msgstr "Razrešiti je treba navedene težave usklajevanja."
 
 #: src/launch.rs:1407
 msgid "{} errors found. "
-msgstr ""
+msgstr "Zaznanih je {} napak. "
 
 #: src/launch.rs:1421
 msgid "Would you like to dismiss this error?"
-msgstr ""
+msgstr "Ali želite preklicati to napako?"
 
 #: src/launch.rs:1448
 msgid "Failed to sync '{}' to '{}' on remote."
@@ -158,7 +164,7 @@ msgstr ""
 
 #: src/launch.rs:1490 src/launch.rs:1495 src/launch.rs:1503
 msgid "File Update"
-msgstr ""
+msgstr "Posodobitev datoteke"
 
 #: src/launch.rs:1490
 msgid "Neither the local item or remote item exists anymore. This error will now be removed."
@@ -178,23 +184,23 @@ msgstr ""
 
 #: src/launch.rs:1515
 msgid "Which item would you like to keep?"
-msgstr ""
+msgstr "Katero različico želite ohraniti?"
 
 #: src/launch.rs:1517
 msgid "Local"
-msgstr ""
+msgstr "Krajevno"
 
 #: src/launch.rs:1518
 msgid "Remote"
-msgstr ""
+msgstr "Oddaljeno"
 
 #: src/launch.rs:1567
 msgid "1 error found."
-msgstr ""
+msgstr "Zaznana je 1 napaka."
 
 #: src/launch.rs:1569
 msgid "{} errors found."
-msgstr ""
+msgstr "Zaznanih je {} napak."
 
 #: src/launch.rs:1701
 msgid "Checking '{}' for changes..."
@@ -230,11 +236,11 @@ msgstr ""
 
 #: src/login/login_util.rs:15
 msgid "Name"
-msgstr ""
+msgstr "Naziv"
 
 #: src/login/login_util.rs:27
 msgid "Name already exists."
-msgstr ""
+msgstr "Ta naziv že obstaja."
 
 #: src/login/login_util.rs:29
 msgid "Invalid name. Names must:\n"
@@ -242,26 +248,30 @@ msgid "Invalid name. Names must:\n"
 "- Not start with '-' or a space\n"
 "- Not end with a space"
 msgstr ""
+"Neveljaven naziv. Uporabiti je mogoče:\n"
+"- le števila, črke, presledek in posebne znake »_«, »-« in ».«\n"
+"- ni dovoljeno začeti naziva s presledkom ali znakom »-«\n"
+"- ni dovoljeno končati naziva s presledkom"
 
 #: src/login/login_util.rs:43
 msgid "Server URL"
-msgstr ""
+msgstr "Naslov URL strežnika"
 
 #: src/login/login_util.rs:49
 msgid "Invalid server URL ({})."
-msgstr ""
+msgstr "Neveljaven naslov URL strežnika ({})."
 
 #: src/login/login_util.rs:58
 msgid "Invalid server URL (no domain specified)."
-msgstr ""
+msgstr "Neveljaven naslov URL strežnika (ni določene domene)."
 
 #: src/login/login_util.rs:62
 msgid "Invalid server URL (password was specified)."
-msgstr ""
+msgstr "Neveljaven naslov URL strežnika (določeno je geslo)."
 
 #: src/login/login_util.rs:66
 msgid "Invalid server URL(unknown server scheme {})."
-msgstr ""
+msgstr "Neveljaven naslov URL strežnika (neznana shema strežnika {})."
 
 #: src/login/login_util.rs:78
 msgid "Don't specify '{}' as part of the URL."
@@ -269,27 +279,27 @@ msgstr ""
 
 #: src/login/login_util.rs:91
 msgid "Username"
-msgstr ""
+msgstr "Uporabniško ime"
 
 #: src/login/login_util.rs:97
 msgid "Password"
-msgstr ""
+msgstr "Geslo"
 
 #: src/login/login_util.rs:104
 msgid "2FA Code"
-msgstr ""
+msgstr "Koda 2FA"
 
 #: src/login/login_util.rs:113
 msgid "The provided 2FA code is invalid (should only contain digits)."
-msgstr ""
+msgstr "Podana koda 2FA ni veljavna (vsebovati mora le številke)."
 
 #: src/login/login_util.rs:118
 msgid "The provided 2FA code is invalid (should be 6 digits long)."
-msgstr ""
+msgstr "Podana koda 2FA ni veljavna (koda mora biti šest številčna)."
 
 #: src/login/login_util.rs:142
 msgid "Log in"
-msgstr ""
+msgstr "Prijava"
 
 #: src/login/mod.rs:77
 msgid "Unable to connect to the server. Check your internet connection and try again."
@@ -305,12 +315,12 @@ msgstr ""
 
 #: src/login/mod.rs:87
 msgid "Unable to log in"
-msgstr ""
+msgstr "Prijava ni mogoča"
 
 #. The dropdown for selecting the server type.
 #: src/login/mod.rs:124
 msgid "Server Type"
-msgstr ""
+msgstr "Vrsta strežnika"
 
 #: src/tray.rs:13
 msgid "Awaiting sync checks..."
@@ -318,18 +328,24 @@ msgstr ""
 
 #: src/tray.rs:60
 msgid "Open"
-msgstr ""
+msgstr "Odpri"
 
 #: src/tray.rs:67
 msgid "Close"
-msgstr ""
+msgstr "Zapri"
 
 #: src/main.rs:188
 msgid "Unknown Error"
-msgstr ""
+msgstr "Neznana napaka"
 
 #: src/main.rs:195
 msgid "An unknown error has occurred while running. This is an internal issue with Celeste and should be reported.\n"
 "\n"
 "The following backtrace may help with debugging the issue - note that it may contain information such as login tokens/keys, so avoid posting the information publicly:"
 msgstr ""
+"Med izvajanjem je prišlo do neznane napake. To je notranja napaka programa "
+"Celeste, zato je priporočljivo razvijalcem poslati poročilo.\n"
+"\n"
+"Naslednji izpis lahko pomaga pri odpravljanju težav. Pomembno je vedeti, da "
+"lahko vsebuje zasebne podrobnosti, kot so prijavni žetoni/ključi, zato tega "
+"povzetka ne objavljajte javno:"
