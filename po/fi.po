@@ -8,8 +8,8 @@ msgstr ""
 "Project-Id-Version: Celeste 0.7.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-10-08 00:55+0000\n"
-"PO-Revision-Date: 2023-10-09 12:02+0000\n"
-"Last-Translator: Jiri Grönroos <jiri.gronroos@iki.fi>\n"
+"PO-Revision-Date: 2024-11-30 17:00+0000\n"
+"Last-Translator: Ricky Tigg <ricky.tigg@gmail.com>\n"
 "Language-Team: Finnish <https://hosted.weblate.org/projects/celeste/celeste/"
 "fi/>\n"
 "Language: fi\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 5.1-dev\n"
+"X-Generator: Weblate 5.9-dev\n"
 
 #: src/about.rs:20
 msgid "App icons by"
@@ -149,15 +149,15 @@ msgstr "Haluatko jättää tämän virheen huomiotta?"
 
 #: src/launch.rs:1269
 msgid "Failed to sync '{}' to '{}' on remote."
-msgstr ""
+msgstr "'{}':n synkronointi '{}':een etäällä epäonnistui."
 
 #: src/launch.rs:1277
 msgid "Failed to sync '{}' on remote to '{}'."
-msgstr ""
+msgstr "'{}':n synkronointi etäällä '{}':een epäonnistui."
 
 #: src/launch.rs:1302
 msgid "Unable to fetch data for '{}' from the remote."
-msgstr ""
+msgstr "'{}':n tietoja ei voi noutaa etäältä."
 
 #: src/launch.rs:1311 src/launch.rs:1316 src/launch.rs:1324
 msgid "File Update"
@@ -166,6 +166,8 @@ msgstr "Tiedostopäivitys"
 #: src/launch.rs:1311
 msgid "Neither the local item or remote item exists anymore. This error will now be removed."
 msgstr ""
+"Paikallista kohdetta tai etäkohdetta ei ole enää olemassa. Tämä virhe "
+"poistetaan nyt."
 
 #: src/launch.rs:1316
 msgid "Only the local item exists now, so it will be synced to the remote."
@@ -233,7 +235,7 @@ msgstr "Seuraa selaimeen avattua linkkiä, ja palaa takaisin kun olet valmis."
 
 #: src/login/gdrive.rs:233
 msgid "There was an issue while running the webserver for authentication"
-msgstr ""
+msgstr "Verkkopalvelinta käytettäessä todennusta varten ilmeni vika"
 
 #: src/login/gdrive.rs:242
 msgid "There was an issue authenticating to {}"
