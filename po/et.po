@@ -8,13 +8,16 @@ msgstr ""
 "Project-Id-Version: Celeste 0.8.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-11-19 01:22+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"PO-Revision-Date: 2025-04-01 03:01+0000\n"
+"Last-Translator: Priit Jõerüüt <hwlate@joeruut.com>\n"
+"Language-Team: Estonian <https://hosted.weblate.org/projects/celeste/celeste/"
+"et/>\n"
 "Language: et\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Weblate 5.11-dev\n"
 
 #: src/about.rs:20
 msgid "App icons by"
@@ -70,30 +73,30 @@ msgstr ""
 
 #: src/launch.rs:574
 msgid "Directories"
-msgstr ""
+msgstr "Kaustad"
 
 #. Get the local folder to sync with.
 #: src/launch.rs:597
 msgid "Local folder:"
-msgstr ""
+msgstr "Kohalik kaust:"
 
 #: src/launch.rs:613 src/launch.rs:775 src/login/gdrive.rs:214
 msgid "Cancel"
-msgstr ""
+msgstr "Katkesta"
 
 #. Get the remote folder to sync with, and add it.
 #. The entry completion code is largely inspired by https://github.com/gtk-rs/gtk4-rs/blob/master/examples/entry_completion/main.rs. I honestly have no clue what half the code for that is doing, I just know the current code is working well enough, and it can be fixed later if it breaks.
 #: src/launch.rs:633
 msgid "Remote folder:"
-msgstr ""
+msgstr "Kaugkaust:"
 
 #: src/launch.rs:820
 msgid "The specified remote directory doesn't exist"
-msgstr ""
+msgstr "Valitud kaugkausta pole olemas"
 
 #: src/launch.rs:828
 msgid "Failed to check if the specified remote directory exists"
-msgstr ""
+msgstr "Ei õnnestunud kontrollida, kas valitud kaugkausta on olemas"
 
 #: src/launch.rs:839
 msgid "The specified directory pair is already being synced"
